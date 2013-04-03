@@ -1,6 +1,7 @@
 package net.buddat.bungeechat;
 
 import com.google.common.eventbus.Subscribe;
+import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.config.ServerInfo;
 import net.md_5.bungee.api.event.ChatEvent;
 import net.md_5.bungee.api.plugin.Listener;
@@ -9,7 +10,8 @@ import net.md_5.bungee.api.plugin.Plugin;
 import java.util.Map;
 import java.util.logging.Logger;
 
-public class BungeeChat extends Plugin implements Listener {
+public class BungeeChat extends Plugin {
+    private static final String CHANNEL_NAME = "BungeeChat";
     Logger logger;
 
     @Override
@@ -21,20 +23,18 @@ public class BungeeChat extends Plugin implements Listener {
     @Override
     public void onEnable() {
         super.onEnable();
+        ProxyServer proxy = getProxy();
+        proxy.registerChannel(CHANNEL_NAME);
+        proxy.getPluginManager().registerListener(this, new ChatEventListener(this));
     }
 
     @Override
     public void onDisable(){
         super.onDisable();
-    }
+        ProxyServer proxy = getProxy();
 
-    @Subscribe
-    public void onChatEvent(ChatEvent event) {
-        Map<String, ServerInfo> servers = getProxy().getServers();
-        getProxy().getPluginManager().registerListener(this, this);
-        for (String serverName : servers.keySet()) {
-            ServerInfo server = servers.get(serverName);
-            // no-op
-        }
+        // deregister listener? can't find a command
+
+        proxy.unregisterChannel(CHANNEL_NAME);
     }
 }
