@@ -1,0 +1,4 @@
+name: BungeeChat
+main : net.buddat.bungeechat.BungeeChat
+version: 1.0
+author: buddat & taufiqkh

@@ -28,9 +28,16 @@ public class ChatEventListener implements Listener {
         InetSocketAddress recipientAddress = event.getReceiver().getAddress();
         Map<String, ServerInfo> servers = plugin.getProxy().getServers();
         // send chat to each server? or to players? can't see docs
+        // Sends to each player - servers keep list of players connected to it
         for (String serverName : servers.keySet()) {
             ServerInfo server = servers.get(serverName);
             if (!server.getAddress().equals(recipientAddress)) {
+            	for (ProxiedPlayer plr : server.getPlayers()) {
+            		if (plr == event.getSender())
+            			plr.sendMessage(">> " + event.getMessage());
+            		else
+            			plr.sendMessage("<< " + event.getMessage());
+            	}
             }
         }
     }

@@ -34,7 +34,6 @@ public class BungeeChat extends Plugin {
         ProxyServer proxy = getProxy();
 
         // deregister listener? can't find a command
-
         proxy.unregisterChannel(CHANNEL_NAME);
     }
 }
