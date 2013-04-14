@@ -2,6 +2,7 @@ package net.buddat.bungeechat;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -14,7 +15,7 @@ import org.pircbotx.Colors;
 public class MessageColourTranslater {
     private static final Map<String, String> DEFAULT_MC_IRC_REPLACEMENT_MAP;
     private static final Map<String, String> DEFAULT_IRC_MC_REPLACEMENT_MAP;
-    private static final String COLOUR_CHAR = "\u00A7";
+    private static final String MC_COLOUR_CHAR = "\u00A7";
     private static final String EMPTY_STRING = "";
     
     static {
@@ -36,7 +37,7 @@ public class MessageColourTranslater {
             "c", Colors.RED,
             "d", Colors.MAGENTA,
             "e", Colors.YELLOW,
-            "f", Colors.WHITE,
+            "f", Colors.BLACK,
             "k", EMPTY_STRING,
             "l", Colors.BOLD,
             "m", EMPTY_STRING,
@@ -51,7 +52,25 @@ public class MessageColourTranslater {
         DEFAULT_MC_IRC_REPLACEMENT_MAP = Collections.unmodifiableMap(mcIrcReplacementMap);
         DEFAULT_IRC_MC_REPLACEMENT_MAP = Collections.unmodifiableMap(ircMcReplacementMap);
     }
-    private static final Pattern mcColours = Pattern.compile(COLOUR_CHAR + "([0-9A-FK-Pa-fk-p])");
+    private static final Pattern mcColours = Pattern.compile(MC_COLOUR_CHAR + "([0-9A-FK-Pa-fk-p])");
+    private static final Pattern ircColours;
+    // TODO: This is pretty bad
+    static {
+        StringBuilder regex = new StringBuilder();
+        regex.append("(");
+        Iterator<String> iter = DEFAULT_IRC_MC_REPLACEMENT_MAP.keySet().iterator();
+        regex.append(iter.next());
+        while(iter.hasNext()) {
+            String colour = iter.next();
+            if (colour.length() > 0) {
+                regex.append("|");
+                regex.append(colour);
+            }
+        }
+        regex.append(")");
+        ircColours = Pattern.compile(regex.toString());
+    }
+    
 
     private final Map<String, String> ircMcReplacementMap;
     private final Map<String, String> mcIrcReplacementMap;
@@ -85,7 +104,7 @@ public class MessageColourTranslater {
      *         string is returned.
      */
     public String mcToIrc(String message) {
-        return translate(message, mcIrcReplacementMap);
+        return translate(message, mcColours, mcIrcReplacementMap);
     }
     
     /**
@@ -99,14 +118,14 @@ public class MessageColourTranslater {
      *         string is returned.
      */
     public String ircToMc(String message) {
-        return translate(message, ircMcReplacementMap);
+        return translate(message, ircColours, ircMcReplacementMap);
     }
     
-    public String translate(String message, Map<String, String> replacementMap) {
+    public String translate(String message, Pattern colourPattern, Map<String, String> replacementMap) {
         if (message == null) {
             return EMPTY_STRING;
         }
-        Matcher matcher = mcColours.matcher(message);
+        Matcher matcher = colourPattern.matcher(message);
         StringBuffer sb = new StringBuffer();
         while (matcher.find()) {
             String group = matcher.group(1);
