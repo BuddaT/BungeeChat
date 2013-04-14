@@ -13,19 +13,25 @@ import org.pircbotx.hooks.ListenerAdapter;
 import org.pircbotx.hooks.events.MessageEvent;
 
 public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircBotX> {
+    private static final MessageColouriser colouriser = new MessageColouriser();
+
     private final PircBotX bot;
     private volatile boolean isConnected = false;
 
     private final BasicLogger logger;
-    private final String channelName = "#testbungeechat";
+    private final String channelName;
     private final Channel channel;
     private final String name;
     private final BungeeChat plugin;
+    private final String host;
 
-    public ChatBot(BungeeChat plugin, String name) {
+    public ChatBot(BungeeChat plugin, BungeeChatConfig config) {
         this.plugin = plugin;
         this.logger = plugin.getLogger();
-        this.name = name;
+        this.name = config.botname;
+        this.channelName = config.channel;
+        this.host = config.host;
+        System.out.println(name + ":" + channelName + ":" + host);
         bot = new PircBotX();
         channel = bot.getChannel(channelName);
         bot.getListenerManager().addListener(this);
@@ -34,7 +40,13 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     public void reconnect() {
         try {
             bot.setName(name);
-            bot.connect("irc.rizon.net");
+            // TODO: Investigate whether nullpointerexception is bug in this, or in pircbotx
+            try {
+                bot.connect(host);
+            } catch (NullPointerException e) {
+                logger.error("Couldn't connect", e);
+                setIsConnected(false);
+            }
             bot.joinChannel(channelName);
             setIsConnected(true);
         } catch (NickAlreadyInUseException e) {
@@ -51,7 +63,8 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     }
 
     public void sendMessage(String message) {
-        bot.sendMessage(channel, message);
+        System.out.println(colouriser.mcToIrc(message));
+        bot.sendMessage(channel, colouriser.mcToIrc(message));
     }
 
     public boolean isConnected() {

@@ -8,6 +8,11 @@
   <name>BungeeChat</name>
   <url>https://github.com/BuddaT/BungeeChat</url>
 
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <build.number>Unknown</build.number>
+  </properties>
+
   <repositories>
     <repository>
       <id>sonatype-oss-public</id>
@@ -18,6 +23,10 @@
       <snapshots>
         <enabled>true</enabled>
       </snapshots>
+    </repository>
+    <repository>
+      <id>craftminecraft-dev</id>
+      <url>http://repo.craftminecraft.net/content/groups/public/</url>
     </repository>
   </repositories>
 
@@ -41,9 +50,9 @@
       <version>1.9</version>
     </dependency>
     <dependency>
-      <groupId>com.mcdimensions.BungeeSuite</groupId>
-      <artifactId>BungeeSuite</artifactId>
-      <version>0.86-SNAPSHOT</version>
+      <groupId>net.craftminecraft.bungee</groupId>
+      <artifactId>bungeeyaml</artifactId>
+      <version>1.0</version>
     </dependency>
   </dependencies>
   <build>
@@ -63,6 +72,7 @@
               <artifactSet>
                 <includes>
                   <include>org.pircbotx:pircbotx</include>
+                  <include>net.craftminecraft.bungee:bungeeyaml</include>
                 </includes>
               </artifactSet>
             </configuration>
