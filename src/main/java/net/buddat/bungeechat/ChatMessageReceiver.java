@@ -28,7 +28,9 @@ public class ChatMessageReceiver implements Listener {
         DataInputStream inputStream = new DataInputStream(new ByteArrayInputStream(event.getData()));
         String message;
         try {
-            if (!inputStream.readUTF().equalsIgnoreCase(BungeeChat.SUBCHANNEL_NAME)) {
+        	String subChan = inputStream.readUTF();
+            if (!subChan.equalsIgnoreCase(BungeeChat.SUBCHANNEL_NAME) &&
+            		!subChan.equalsIgnoreCase(BungeeChat.SUBCHANNEL_LOGINOUT)) {
                 return;
             }
             message = inputStream.readUTF();
