@@ -22,7 +22,6 @@ public class ChatMessageReceiver implements Listener {
 
     @Subscribe
     public void onPluginMessageEvent(PluginMessageEvent event) {
-        logger.info("event received: " + event.getTag());
         if (event.isCancelled() || !event.getTag().equalsIgnoreCase(BungeeChat.CHANNEL_INCOMING_NAME)) {
             return;
         }

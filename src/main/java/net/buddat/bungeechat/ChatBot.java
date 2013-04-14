@@ -13,7 +13,7 @@ import org.pircbotx.hooks.ListenerAdapter;
 import org.pircbotx.hooks.events.MessageEvent;
 
 public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircBotX> {
-    private static final MessageColouriser colouriser = new MessageColouriser();
+    private static final MessageColourTranslater colouriser = new MessageColourTranslater();
 
     private final PircBotX bot;
     private volatile boolean isConnected = false;
@@ -78,8 +78,7 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     // TODO: Figure out bungee's concurrency model
     @Override
     public void onMessage(MessageEvent<PircBotX> messageEvent) {
-        System.out.println("Message received");
-        String message = messageEvent.getMessage();
+        String message = colouriser.ircToMc(messageEvent.getMessage());
         String nick = messageEvent.getUser().getNick();
         for (ProxiedPlayer player : plugin.getProxy().getPlayers()) {
             player.sendMessage("[IRC] " + nick + ": " + message);
