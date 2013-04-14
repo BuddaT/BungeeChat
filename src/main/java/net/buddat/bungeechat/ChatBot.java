@@ -63,7 +63,6 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     }
 
     public void sendMessage(String message) {
-        System.out.println(colouriser.mcToIrc(message));
         bot.sendMessage(channel, colouriser.mcToIrc(message));
     }
 

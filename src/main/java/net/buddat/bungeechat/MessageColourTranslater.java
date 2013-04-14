@@ -37,7 +37,7 @@ public class MessageColourTranslater {
             "c", Colors.RED,
             "d", Colors.MAGENTA,
             "e", Colors.YELLOW,
-            "f", Colors.BLACK,
+            "f", Colors.NORMAL,
             "k", EMPTY_STRING,
             "l", Colors.BOLD,
             "m", EMPTY_STRING,
@@ -47,7 +47,9 @@ public class MessageColourTranslater {
         };
         for (int i = 0; i < tuples.length; i+= 2) {
             mcIrcReplacementMap.put(tuples[i], tuples[i + 1]);
-            ircMcReplacementMap.put(tuples[i + 1], tuples[i]);
+            if (tuples[i + 1].length() > 0) {
+                ircMcReplacementMap.put(tuples[i + 1], MC_COLOUR_CHAR + tuples[i]);
+            }
         }
         DEFAULT_MC_IRC_REPLACEMENT_MAP = Collections.unmodifiableMap(mcIrcReplacementMap);
         DEFAULT_IRC_MC_REPLACEMENT_MAP = Collections.unmodifiableMap(ircMcReplacementMap);
@@ -57,18 +59,24 @@ public class MessageColourTranslater {
     // TODO: This is pretty bad
     static {
         StringBuilder regex = new StringBuilder();
-        regex.append("(");
+        regex.append("(\\x03");
         Iterator<String> iter = DEFAULT_IRC_MC_REPLACEMENT_MAP.keySet().iterator();
-        regex.append(iter.next());
+        regex.append("(");
+        boolean first = true;
         while(iter.hasNext()) {
             String colour = iter.next();
-            if (colour.length() > 0) {
-                regex.append("|");
-                regex.append(colour);
+            if (colour.length() >= 2) {
+                if (first) {
+                    first = false;
+                } else {
+                    regex.append("|");
+                }
+                regex.append(colour.substring(1));
             }
         }
-        regex.append(")");
+        regex.append("))");
         ircColours = Pattern.compile(regex.toString());
+        System.out.println("IRC pattern: " + regex.toString());
     }
     
 
@@ -127,6 +135,7 @@ public class MessageColourTranslater {
         }
         Matcher matcher = colourPattern.matcher(message);
         StringBuffer sb = new StringBuffer();
+        // TODO: replace this with callback of some kind
         while (matcher.find()) {
             String group = matcher.group(1);
             String replacement = replacementMap.get(group.toLowerCase());
