@@ -12,7 +12,9 @@ public class BasicLogger {
 	
 	private String stackTraceAsString(Throwable t) {
 		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-		t.printStackTrace(new PrintWriter(bytes));
+		PrintWriter writer = new PrintWriter(bytes);
+		t.printStackTrace(writer);
+		writer.flush();
 		return bytes.toString();
 	}
 

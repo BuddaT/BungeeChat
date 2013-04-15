@@ -3,6 +3,7 @@ package net.buddat.bungeechat;
 import net.craftminecraft.bungee.bungeeyaml.InvalidConfigurationException;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.plugin.Plugin;
+import net.md_5.bungee.api.plugin.PluginManager;
 
 public class BungeeChat extends Plugin {
 	
@@ -14,6 +15,7 @@ public class BungeeChat extends Plugin {
     public static final String SUBCHANNEL_NAME = "chat";
     public static final String SUBCHANNEL_LOGINOUT = "login_logout";
 
+    public static final String BASE_PERMISSION = "bungeechat";
 
     private BasicLogger logger;
     private ChatBot bot;
@@ -43,8 +45,10 @@ public class BungeeChat extends Plugin {
             logger.warn("Can't find channel " + CHANNEL_INCOMING_NAME + " in list of channels");
         }
         bot = new ChatBot(this, config);
-        proxy.getPluginManager().registerListener(this, new ChatMessageReceiver(this, bot));
+        PluginManager pluginManager = proxy.getPluginManager();
+        pluginManager.registerListener(this, new ChatMessageReceiver(this, bot));
         bot.reconnect();
+        pluginManager.registerCommand(this, new BungeeChatCommand(this, bot));
     }
 
     @Override
@@ -55,6 +59,6 @@ public class BungeeChat extends Plugin {
         } catch (InvalidConfigurationException e) {
             logger.error("Couldn't save config", e);
         }*/
-        bot.disconnectAll();
+        bot.disconnect();
     }
 }

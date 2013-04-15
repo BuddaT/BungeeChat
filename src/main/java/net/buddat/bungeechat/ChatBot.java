@@ -1,9 +1,10 @@
 package net.buddat.bungeechat;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
-import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.connection.ProxiedPlayer;
+import net.md_5.bungee.api.scheduler.ScheduledTask;
 
 import org.pircbotx.Channel;
 import org.pircbotx.PircBotX;
@@ -11,16 +12,14 @@ import org.pircbotx.exception.IrcException;
 import org.pircbotx.exception.NickAlreadyInUseException;
 import org.pircbotx.hooks.Listener;
 import org.pircbotx.hooks.ListenerAdapter;
+import org.pircbotx.hooks.events.DisconnectEvent;
 import org.pircbotx.hooks.events.MessageEvent;
-
-import sun.security.krb5.Config;
 
 public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircBotX> {
     private static final MessageColourTranslater colouriser = new MessageColourTranslater();
 
     private final PircBotX bot;
-    private volatile boolean isConnected = false;
-
+    
     private final BasicLogger logger;
     
     private final String channelName;
@@ -32,7 +31,15 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     private final boolean useNickserv;
     
     private final BungeeChat plugin;
+    private final int reconnectTime;
 
+    private final Object lock = new Object();
+    
+    private volatile ScheduledTask reconnectionTask;
+    private volatile boolean isIntentionalDisconnect = false;
+    
+    private final String connectionMessage;
+    private final String disconnectionMessage;
 
     public ChatBot(BungeeChat plugin, BungeeChatConfig config) {
         this.plugin = plugin;
@@ -41,11 +48,14 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
         this.name = config.botname;
         this.channelName = config.channel;
         this.host = config.host;
+        this.reconnectTime = config.reconnectTime;
         
         this.useNickserv = config.useNickserv;
         this.nickservPassword = config.nickservPassword;
         
-        System.out.println(name + ":" + channelName + ":" + host);
+        connectionMessage = "IRC bot \"" + name + "\" connected to " + host + " channel " + channelName + ".";
+        disconnectionMessage = "IRC bot disconnected, will attempt reconnect in " + reconnectTime + " seconds";
+        
         bot = new PircBotX();
         channel = bot.getChannel(channelName);
         
@@ -53,6 +63,20 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     }
     
     public void reconnect() {
+        if (reconnectionTask != null) {
+            plugin.getProxy().getScheduler().cancel(reconnectionTask);
+            synchronized(lock) {
+                reconnectionTask = null;
+            }
+        }
+        autoReconnect();
+    }
+    
+    private void autoReconnect() {
+        if (bot.isConnected()) {
+            logger.info("IRC Bot is already connected, disconnect first");
+            return;
+        }
         try {
             bot.setName(name);
             // TODO: Investigate whether nullpointerexception is bug in this, or in pircbotx
@@ -60,14 +84,13 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
                 bot.connect(host);
             } catch (NullPointerException e) {
                 logger.error("Couldn't connect", e);
-                setIsConnected(false);
             }
             
             if (useNickserv)
-            	bot.sendMessage("NickServ", "identify " + nickservPassword);
+                bot.sendMessage("NickServ", "identify " + nickservPassword);
             
             bot.joinChannel(channelName);
-            setIsConnected(true);
+            logger.info(connectionMessage);
         } catch (NickAlreadyInUseException e) {
             logger.error("Nick already in use: " + bot.getName(), e);
         } catch (IOException e) {
@@ -77,7 +100,13 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
         }
     }
     
-    public void disconnectAll() {
+    /**
+     * Disconnects from the server.
+     */
+    public void disconnect() {
+        synchronized(lock) {
+            isIntentionalDisconnect = true;
+        }
         bot.disconnect();
     }
 
@@ -85,20 +114,21 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
         bot.sendMessage(channel, colouriser.mcToIrc(message));
     }
 
+    /**
+     * Whether or not the chat bot is believed to be connected.
+     * 
+     * @return True if the bot is believed to be connected, otherwise false.
+     */
     public boolean isConnected() {
-        return isConnected;
-    }
-
-    private synchronized void setIsConnected(boolean newConnected) {
-        isConnected = newConnected;
+        return bot.isConnected();
     }
 
     // TODO: Figure out bungee's concurrency model
     @Override
     public void onMessage(MessageEvent<PircBotX> messageEvent) {
         if (messageEvent.getMessage().startsWith("!")) {
-        	processCommand(messageEvent);
-        	return;
+            processCommand(messageEvent);
+            return;
         }
         
         String message = colouriser.ircToMc(messageEvent.getMessage());
@@ -110,16 +140,32 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     }
     
     private void processCommand(MessageEvent<PircBotX> messageEvent) {
-    	String message = messageEvent.getMessage();
-    	
-    	if (message.equalsIgnoreCase("!players")) {
-    		String playerMsg = "Online (";
-    		playerMsg += plugin.getProxy().getPlayers().size() + "): ";
-    		
-    		for (ProxiedPlayer player : plugin.getProxy().getPlayers())
-    			playerMsg += player.getName() + " ";
-    		
-    		bot.sendMessage(channel, playerMsg);
-    	}
+        String message = messageEvent.getMessage();
+
+        if (message.equalsIgnoreCase("!players")) {
+            String playerMsg = "Online (";
+            playerMsg += plugin.getProxy().getPlayers().size() + "): ";
+
+            for (ProxiedPlayer player : plugin.getProxy().getPlayers())
+                playerMsg += player.getName() + " ";
+
+            bot.sendMessage(channel, playerMsg);
+        }
+    }
+    
+    public void onDisconnect(DisconnectEvent<PircBotX> event) {
+        if (isIntentionalDisconnect) {
+            logger.info("IRC bot intentionally disconnected");
+            return;
+        }
+        synchronized(lock) {
+            reconnectionTask = plugin.getProxy().getScheduler().schedule(plugin, new Runnable() {
+                @Override
+                public void run() {
+                    autoReconnect();
+                }
+            }, reconnectTime, TimeUnit.SECONDS);
+        }
+        logger.info(disconnectionMessage);
     }
 }
