@@ -54,11 +54,6 @@ public class BungeeChat extends Plugin {
     @Override
     public void onDisable(){
         super.onDisable();
-        /*try {
-            config.save();
-        } catch (InvalidConfigurationException e) {
-            logger.error("Couldn't save config", e);
-        }*/
         bot.disconnect();
     }
 }

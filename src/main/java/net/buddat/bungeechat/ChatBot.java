@@ -33,9 +33,11 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     private final BungeeChat plugin;
     private final int reconnectTime;
 
+    // lock to cover reconnection task and intentional disconnect
     private final Object lock = new Object();
-    
+    // guarded by lock
     private volatile ScheduledTask reconnectionTask;
+    // guarded by lock
     private volatile boolean isIntentionalDisconnect = false;
     
     private final String connectionMessage;
@@ -63,19 +65,22 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     }
     
     public void reconnect() {
-        if (reconnectionTask != null) {
-            plugin.getProxy().getScheduler().cancel(reconnectionTask);
-            synchronized(lock) {
-                reconnectionTask = null;
+        synchronized(lock) {
+            isIntentionalDisconnect = false;
+            if (autoReconnect() && reconnectionTask != null) {
+                if (reconnectionTask != null) {
+                    plugin.getProxy().getScheduler().cancel(reconnectionTask);
+                    reconnectionTask = null;
+                }
             }
+            logger.debug("Cancelled reconnection task");
         }
-        autoReconnect();
     }
     
-    private void autoReconnect() {
+    private boolean autoReconnect() {
         if (bot.isConnected()) {
             logger.info("IRC Bot is already connected, disconnect first");
-            return;
+            return false;
         }
         try {
             bot.setName(name);
@@ -91,13 +96,16 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
             
             bot.joinChannel(channelName);
             logger.info(connectionMessage);
+            return true;
         } catch (NickAlreadyInUseException e) {
             logger.error("Nick already in use: " + bot.getName(), e);
+            bot.disconnect();
         } catch (IOException e) {
             logger.error("Can't connect, IO error", e);
         } catch (IrcException e) {
             logger.error("Can't connect, IRC error", e);
         }
+        return false;
     }
     
     /**
@@ -126,12 +134,13 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
     // TODO: Figure out bungee's concurrency model
     @Override
     public void onMessage(MessageEvent<PircBotX> messageEvent) {
-        if (messageEvent.getMessage().startsWith("!")) {
+        String message = messageEvent.getMessage();
+        if (message.startsWith("!")) {
             processCommand(messageEvent);
             return;
         }
         
-        String message = colouriser.ircToMc(messageEvent.getMessage());
+        message = colouriser.ircToMc(message);
         String nick = messageEvent.getUser().getNick();
         
         for (ProxiedPlayer player : plugin.getProxy().getPlayers()) {
@@ -153,19 +162,30 @@ public class ChatBot extends ListenerAdapter<PircBotX> implements Listener<PircB
         }
     }
     
+    @Override
     public void onDisconnect(DisconnectEvent<PircBotX> event) {
         if (isIntentionalDisconnect) {
             logger.info("IRC bot intentionally disconnected");
-            return;
-        }
-        synchronized(lock) {
-            reconnectionTask = plugin.getProxy().getScheduler().schedule(plugin, new Runnable() {
-                @Override
-                public void run() {
-                    autoReconnect();
+        } else if (reconnectionTask == null) {
+            synchronized(lock) {
+                if (reconnectionTask == null) {
+                    reconnectionTask = plugin.getProxy().getScheduler().schedule(
+                            plugin, new Reconnection(), reconnectTime, reconnectTime, TimeUnit.SECONDS);
                 }
-            }, reconnectTime, TimeUnit.SECONDS);
+            }
+            logger.info(disconnectionMessage);
         }
-        logger.info(disconnectionMessage);
+    }
+    
+    private class Reconnection implements Runnable {
+        @Override
+        public void run() {
+            synchronized (lock) {
+                if (autoReconnect()) {
+                    plugin.getProxy().getScheduler().cancel(reconnectionTask);
+                    reconnectionTask = null;
+                }
+            }
+        }
     }
 }

@@ -4,7 +4,7 @@
   <groupId>net.buddat.bungeechat</groupId>
   <artifactId>BungeeChat</artifactId>
   <packaging>jar</packaging>
-  <version>0.1-SNAPSHOT</version>
+  <version>0.2-SNAPSHOT</version>
   <name>BungeeChat</name>
   <url>https://github.com/BuddaT/BungeeChat</url>
 
